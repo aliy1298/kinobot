@@ -84,35 +84,39 @@ async def start(message: types.Message):
        (message.from_user.id,message.from_user.username,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
+    # Majburiy kanallarni olish
+    channels = [x[0] for x in db("SELECT channel_id FROM channels", all=True)]
     not_joined = await check_sub(message.from_user.id)
-
-    if not not_joined:
-        await message.answer("🎬 Kino kodini yuboring")
-        return
 
     builder = InlineKeyboardBuilder()
 
-    for ch in not_joined:
+    for ch in channels:
         try:
-            invite = await bot.create_chat_invite_link(
-                chat_id=ch,
-                member_limit=1
-            )
+            invite = await bot.create_chat_invite_link(chat_id=ch, member_limit=1)
+            status = "✅ A'zo bo'lgansiz" if ch not in not_joined else "📢 Qo‘shiling"
             builder.row(
                 InlineKeyboardButton(
-                    text="📢 Kanalga a'zo bo'lish",
+                    text=f"{ch} - {status}",
                     url=invite.invite_link
                 )
             )
         except Exception as e:
             print(e)
 
-    builder.row(
-        InlineKeyboardButton(
-            text="✅ Tekshirish",
-            callback_data="check"
-        )
+    builder.row(InlineKeyboardButton(text="✅ Tekshirish", callback_data="check"))
+
+    await message.answer(
+        "Botdan foydalanish uchun majburiy kanallarga a'zo bo'ling:",
+        reply_markup=builder.as_markup()
     )
+
+@dp.callback_query(F.data=="check")
+async def check_btn(call: CallbackQuery):
+    not_joined = await check_sub(call.from_user.id)
+    if not not_joined:
+        await call.message.edit_text("✅ Tasdiqlandi! Endi kino kodi yuboring.")
+    else:
+        await call.answer(f"Hali a'zo bo'lmagan kanallar: {', '.join(not_joined)}", show_alert=True)
 
     await message.answer(
         "Botdan foydalanish uchun kanalga a'zo bo'ling:",
